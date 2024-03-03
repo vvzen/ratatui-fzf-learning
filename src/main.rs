@@ -7,6 +7,7 @@ use crossterm::{
 };
 
 mod app;
+mod backend;
 mod errors;
 mod tui;
 
@@ -46,7 +47,7 @@ fn main() -> color_eyre::Result<()> {
     enable_raw_mode()?;
 
     let mut terminal = tui::init()?;
-    let app_result = app::App::default().run(&mut terminal)?;
+    let app_result = app::App::new().run(&mut terminal)?;
     log::info!("App result: {app_result:?}");
     log::info!("Exiting cleanly...");
 
