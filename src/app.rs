@@ -1,10 +1,10 @@
-use std::io;
+use color_eyre::eyre::WrapErr;
 
 use crate::tui;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    prelude::{Alignment, CrosstermBackend, Stylize, Terminal},
+    prelude::{Alignment, Stylize},
     symbols::border,
     terminal::Frame,
     text::{Line, Text},
@@ -23,13 +23,13 @@ pub struct App {
 }
 
 impl App {
-    pub fn run(&mut self, terminal: &mut tui::Tui) -> io::Result<u8> {
+    pub fn run(&mut self, terminal: &mut tui::Tui) -> color_eyre::Result<u8> {
         while !self.should_exit {
             // Draw all the widgets
             terminal.draw(|frame| self.render_frame(frame))?;
 
             // Handle events
-            self.handle_events()?;
+            self.handle_events().wrap_err("handle_events failed")?;
         }
 
         Ok(self.counter)
@@ -39,38 +39,57 @@ impl App {
         frame.render_widget(self, frame.size());
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
+    fn handle_events(&mut self) -> color_eyre::Result<()> {
         match event::read()? {
             // It's important to check that the event is a key press event as
             // crossterm also emits key release and repeat events on Windows.
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
-            }
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => self
+                .handle_key_event(key_event)
+                .wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}"))?,
             _ => {}
         };
 
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
+    fn handle_key_event(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Left => self.decrement_counter(),
-            KeyCode::Right => self.increment_counter(),
+            KeyCode::Left => self.decrement_counter()?,
+            KeyCode::Right => self.increment_counter()?,
             _ => {}
         }
+
+        Ok(())
     }
 
     fn exit(&mut self) {
         self.should_exit = true;
     }
 
-    fn increment_counter(&mut self) {
-        self.counter += 1;
+    fn increment_counter(&mut self) -> color_eyre::Result<()> {
+        let new_value = self
+            .counter
+            .checked_add(1)
+            .ok_or(format!("Overflow when adding 1 from {}", self.counter))
+            .map_err(color_eyre::eyre::Error::msg)?;
+
+        self.counter = new_value;
+        Ok(())
     }
 
-    fn decrement_counter(&mut self) {
-        self.counter -= 1;
+    fn decrement_counter(&mut self) -> color_eyre::Result<()> {
+        let new_value = self
+            .counter
+            .checked_sub(1)
+            .ok_or(format!(
+                "Underflow when subtracting 1 from {}",
+                self.counter
+            ))
+            .map_err(color_eyre::eyre::Error::msg)?;
+
+        self.counter = new_value;
+        Ok(())
     }
 }
 

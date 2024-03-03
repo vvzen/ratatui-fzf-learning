@@ -1,28 +1,18 @@
 use std::io::Write;
 
-use color_eyre::owo_colors::{OwoColorize, Style};
+use color_eyre::owo_colors::OwoColorize;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use ratatui::{
-    prelude::*,
-    symbols::border,
-    widgets::{block::*, *},
-};
-
-use ratatui::{
-    prelude::{CrosstermBackend, Stylize, Terminal},
-    widgets::Paragraph,
-};
 
 mod app;
+mod errors;
 mod tui;
 
 fn main() -> color_eyre::Result<()> {
     // Install the error handlers by 'eyre'
-    color_eyre::install()?;
+    errors::install_hooks()?;
 
     // Enable LOG info by default if the caller didn't provide any overrides
     // or if it set the RUST_LOG env var incorrectly
@@ -57,9 +47,6 @@ fn main() -> color_eyre::Result<()> {
 
     let mut terminal = tui::init()?;
     let app_result = app::App::default().run(&mut terminal)?;
-
-    tui::restore()?;
-
     log::info!("App result: {app_result:?}");
     log::info!("Exiting cleanly...");
 
