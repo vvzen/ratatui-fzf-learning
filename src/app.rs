@@ -8,22 +8,19 @@ use ratatui::{
     symbols::border,
     terminal::Frame,
     text::{Line, Text},
-    widgets::{
-        block::{Position, Title},
-        Block, Borders, Paragraph, Widget,
-    },
+    widgets::{block::Title, Block, Borders, Paragraph, Widget},
 };
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 #[derive(Debug, Default)]
 pub struct App {
-    counter: u8,
+    search_text: String,
     should_exit: bool,
 }
 
 impl App {
-    pub fn run(&mut self, terminal: &mut tui::Tui) -> color_eyre::Result<u8> {
+    pub fn run(&mut self, terminal: &mut tui::Tui) -> color_eyre::Result<String> {
         while !self.should_exit {
             // Draw all the widgets
             terminal.draw(|frame| self.render_frame(frame))?;
@@ -32,7 +29,7 @@ impl App {
             self.handle_events().wrap_err("handle_events failed")?;
         }
 
-        Ok(self.counter)
+        Ok(self.search_text.clone())
     }
 
     fn render_frame(&self, frame: &mut Frame) {
@@ -55,8 +52,13 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Left => self.decrement_counter()?,
-            KeyCode::Right => self.increment_counter()?,
+            KeyCode::Char('Q') => self.exit(),
+            KeyCode::Backspace => {
+                self.search_text.pop();
+            }
+            KeyCode::Char(char) => {
+                self.search_text.push(char);
+            }
             _ => {}
         }
 
@@ -66,58 +68,20 @@ impl App {
     fn exit(&mut self) {
         self.should_exit = true;
     }
-
-    fn increment_counter(&mut self) -> color_eyre::Result<()> {
-        let new_value = self
-            .counter
-            .checked_add(1)
-            .ok_or(format!("Overflow when adding 1 from {}", self.counter))
-            .map_err(color_eyre::eyre::Error::msg)?;
-
-        self.counter = new_value;
-        Ok(())
-    }
-
-    fn decrement_counter(&mut self) -> color_eyre::Result<()> {
-        let new_value = self
-            .counter
-            .checked_sub(1)
-            .ok_or(format!(
-                "Underflow when subtracting 1 from {}",
-                self.counter
-            ))
-            .map_err(color_eyre::eyre::Error::msg)?;
-
-        self.counter = new_value;
-        Ok(())
-    }
 }
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Title::from(" Counter App Tutorial ".bold());
-        let instructions = Title::from(Line::from(vec![
-            " Decrement ".into(),
-            "<Left>".blue().bold().into(),
-            " Increment ".into(),
-            " <Right>".blue().bold().into(),
-            " Quit ".into(),
-            " <Q> ".blue().bold().into(),
-        ]));
+        let title = Title::from(" Fuzzy search sample ".bold());
 
         let block = Block::default()
             .title(title.alignment(Alignment::Center))
-            .title(
-                instructions
-                    .alignment(Alignment::Center)
-                    .position(Position::Bottom),
-            )
             .borders(Borders::ALL)
             .border_set(border::THICK);
 
         let counter_text = Text::from(vec![Line::from(vec![
-            "Value: ".into(),
-            self.counter.to_string().yellow(),
+            "Search text: ".into(),
+            self.search_text.clone().yellow(),
         ])]);
 
         Paragraph::new(counter_text)
@@ -135,18 +99,18 @@ mod tests {
     #[test]
     fn test_handle_counter_interaction() {
         let mut app = App::default();
-        app.handle_key_event(KeyCode::Right.into());
-        assert_eq!(app.counter, 1);
+        app.handle_key_event(KeyCode::Char('a').into()).unwrap();
+        assert_eq!(app.search_text, String::from("a"));
 
-        app.handle_key_event(KeyCode::Left.into());
-        assert_eq!(app.counter, 0);
+        app.handle_key_event(KeyCode::Char('b').into()).unwrap();
+        assert_eq!(app.search_text, String::from("ab"));
     }
 
     #[test]
-    fn test_handle_exit() -> io::Result<()> {
+    fn test_handle_exit() -> color_eyre::Result<()> {
         // If a user presses 'q', we should quit
         let mut app = App::default();
-        app.handle_key_event(KeyCode::Char('q').into());
+        app.handle_key_event(KeyCode::Char('q').into()).unwrap();
         assert_eq!(app.should_exit, true);
 
         Ok(())
