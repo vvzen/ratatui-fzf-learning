@@ -1,4 +1,6 @@
 use color_eyre::eyre::WrapErr;
+use ratatui::style::Color;
+use ratatui::style::Styled;
 
 use crate::backend;
 use crate::tui;
@@ -25,6 +27,7 @@ pub struct App {
     current_sequence: Option<String>,
     should_exit: bool,
     search_items: Vec<String>,
+    highlighted_item_index: usize,
 }
 
 impl App {
@@ -37,22 +40,41 @@ impl App {
             current_sequence: None,
             should_exit: false,
             search_items: projects,
+            highlighted_item_index: 0,
         }
     }
 
-    fn search(&self) -> Vec<String> {
-        // TODO: This should be hierarchical
+    fn search(&mut self) -> Vec<String> {
+        // TODO: This search should happen hierarchically
         // e.g.: If the project has been chosen,
         // choose the sequence/asset, if the sequence/asset has been chosen,
         // choose the shot, etc..
         let all_items = backend::get_projects();
 
-        // TODO: Proper fuzzy finding
-        let new_items = all_items
+        // Keep track of the current highlightem item
+        let current_highlighted_index = self.highlighted_item_index;
+        let current_highlighted_item = self
+            .search_items
+            .iter()
+            .enumerate()
+            .find(|(i, _item)| i == &current_highlighted_index)
+            .map(|(_i, item)| item);
+
+        // TODO: Proper fuzzy finding instead of just 'contains'
+        let new_items: Vec<_> = all_items
             .iter()
             .filter(|i| i.contains(&self.search_text))
             .map(|i| i.to_string())
             .collect();
+
+        // Restore the highlighted element, if possible
+        if let Some(item) = current_highlighted_item {
+            let new_highlighted_index = match new_items.binary_search(&item) {
+                Ok(s) => s,
+                Err(_) => 0,
+            };
+            self.highlighted_item_index = new_highlighted_index;
+        }
 
         new_items
     }
@@ -101,8 +123,17 @@ impl App {
                 self.search_text.push(char);
                 self.search_items = self.search();
             }
-            KeyCode::Tab => {
-                // TODO: Move across the items
+            KeyCode::Tab | KeyCode::Down => {
+                let next_index = self
+                    .highlighted_item_index
+                    .saturating_add(1)
+                    .min(self.search_items.len() - 1);
+
+                self.highlighted_item_index = next_index;
+            }
+            KeyCode::BackTab | KeyCode::Up => {
+                let next_index = self.highlighted_item_index.saturating_sub(1).max(0);
+                self.highlighted_item_index = next_index;
             }
             KeyCode::Enter => {
                 // TODO: Select an item and go to the next stage
@@ -118,7 +149,7 @@ impl App {
     }
 
     fn render_header(&self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(" Fuzzy search sample ")
+        Paragraph::new(" Fuzzy search sample (press shift+q to quit) ")
             .bold()
             .centered()
             .render(area, buf);
@@ -145,11 +176,15 @@ impl App {
             .enumerate()
             .map(|(i, m)| {
                 let content = Span::from(Span::raw(format!("{i}: {m}")));
-                ListItem::new(content)
+                if i == self.highlighted_item_index {
+                    ListItem::new(content).set_style(Color::Magenta)
+                } else {
+                    ListItem::new(content)
+                }
             })
             .collect();
 
-        let items = List::new(items).block(inner_block.title("> Results"));
+        let items = List::new(items).block(inner_block.title("> Results").italic());
         Widget::render(items, area, buf);
     }
 
