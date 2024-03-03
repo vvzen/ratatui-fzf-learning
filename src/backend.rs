@@ -2,15 +2,16 @@ use std::collections::HashMap;
 
 pub fn get_projects() -> Vec<String> {
     vec![
-        "some_very_long_project_name".to_string(),
-        "some_other_long_project_name".to_string(),
+        "some_very_long_project_name_12345".to_string(),
+        "some_other_long_project_name_23456".to_string(),
         "project_001".to_string(),
         "project_002".to_string(),
+        "project_003".to_string(),
         "man_vs_bee".to_string(),
         "pipeline_testing_2022_2".to_string(),
         "asset_library_2024".to_string(),
         "asset_library_2023".to_string(),
-        "rt_sandbox_2024".to_string(),
+        "comp_sandbox_2024".to_string(),
         "rnd_sandbox_2024".to_string(),
     ]
 }
